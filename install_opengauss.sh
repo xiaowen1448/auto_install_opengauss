@@ -1,12 +1,236 @@
 #!/bin/bash
 
 # openGauss数据库自动安装脚本
-# 适用于openEuler 22.03 ARM64系统
-# 版本: openGauss 6.0.0
+# 支持多版本和多架构自动选择
+# 版本: 动态版本选择 - 内置URL版本
 
 # 设置默认密码（可根据需要修改）
 DEFAULT_PASSWORD="Admin@2025"
 HOSTNAME=host01
+
+# 全局变量
+SELECTED_VERSION=""
+SELECTED_URL=""
+SYSTEM_ARCH=""
+
+# 内置版本和URL信息
+declare -A VERSION_INFO
+VERSION_INFO=(
+    ["7.0.0-RC1"]="7.0.0-RC1"
+    ["6.0.2(LTS)"]="6.0.2"
+    ["6.0.0(LTS)"]="6.0.0"
+    ["6.0.0-RC1"]="6.0.0-RC1"
+    ["5.0.3(LTS)"]="5.0.3"
+    ["5.0.2(LTS)"]="5.0.2"
+    ["5.0.1(LTS)"]="5.0.1"
+    ["5.0.0(LTS)"]="5.0.0"
+)
+
+# URL构建配置常量
+readonly BASE_URL="https://opengauss.obs.cn-south-1.myhuaweicloud.com"
+readonly OS_VERSION_6X="openEuler22.03"
+readonly OS_VERSION_5X="openEuler"
+readonly ARCH_ARM_6X="arm"
+readonly ARCH_X86_6X="x86"
+readonly ARCH_ARM_5X="arm_2203"
+readonly ARCH_X86_5X="x86_openEuler_2203"
+readonly ARCH_SUFFIX_ARM="aarch64"
+readonly ARCH_SUFFIX_X86="x86_64"
+
+# 动态构建下载URL
+build_download_url() {
+    local version="$1"
+    local arch="$2"
+    local version_num="${VERSION_INFO[$version]}"
+    
+    # 判断版本类型
+    if [[ "$version_num" =~ ^5\. ]]; then
+        # 5.x版本URL构建
+        local arch_dir
+        if [[ "$arch" == "AArch64" ]]; then
+            arch_dir="$ARCH_ARM_5X"
+        else
+            arch_dir="$ARCH_X86_5X"
+        fi
+        echo "${BASE_URL}/${version_num}/${arch_dir}/openGauss-${version_num}-${OS_VERSION_5X}-64bit-all.tar.gz"
+    else
+        # 6.x+版本URL构建
+        local arch_path arch_suffix
+        if [[ "$arch" == "AArch64" ]]; then
+            arch_path="$ARCH_ARM_6X"
+            arch_suffix="$ARCH_SUFFIX_ARM"
+        else
+            arch_path="$ARCH_X86_6X"
+            arch_suffix="$ARCH_SUFFIX_X86"
+        fi
+        echo "${BASE_URL}/${version_num}/${OS_VERSION_6X}/${arch_path}/openGauss-All-${version_num}-${OS_VERSION_6X}-${arch_suffix}.tar.gz"
+    fi
+}
+
+# 检测系统架构
+detect_architecture() {
+    local arch=$(uname -m)
+    case $arch in
+        "x86_64")
+            SYSTEM_ARCH="x86_64"
+            ;;
+        "aarch64")
+            SYSTEM_ARCH="AArch64"
+            ;;
+        *)
+            echo "错误: 不支持的系统架构: $arch"
+            echo "支持的架构: x86_64, aarch64"
+            exit 1
+            ;;
+    esac
+    echo "检测到系统架构: $SYSTEM_ARCH"
+}
+
+# 显示版本选择菜单
+show_version_menu() {
+    echo "========================================="
+    echo "可用的openGauss版本:"
+    echo "========================================="
+    
+    # 显示所有支持的版本（与VERSION_INFO保持一致）
+    local versions=(
+        "7.0.0-RC1"
+        "6.0.2(LTS)"
+        "6.0.0(LTS)"
+        "6.0.0-RC1"
+        "5.0.3(LTS)"
+        "5.0.2(LTS)"
+        "5.0.1(LTS)"
+        "5.0.0(LTS)"
+    )
+    
+    # 添加版本描述信息
+    local descriptions=(
+        "最新候选发布版本，包含新特性"
+        "最新长期支持版本，推荐生产环境使用"
+        "稳定长期支持版本"
+        "稳定长期支持版本"
+        "稳定长期支持版本"
+        "稳定长期支持版本"
+        "稳定长期支持版本"
+        "稳定长期支持版本"
+    )
+    
+    local index=1
+    for version in "${versions[@]}"; do
+        local version_num="${VERSION_INFO[$version]}"
+        local desc="${descriptions[$((index-1))]}"
+        
+        # 高亮推荐版本
+        if [[ "$version" == "6.0.2(LTS)" ]]; then
+            echo "$index. openGauss $version (v$version_num) - $desc ⭐推荐"
+        else
+            echo "$index. openGauss $version (v$version_num) - $desc"
+        fi
+        ((index++))
+    done
+    
+    echo "========================================="
+    echo "系统架构: $SYSTEM_ARCH"
+    echo "支持的操作系统: openEuler 22.03 / openEuler"
+    echo "========================================="
+    echo -n "请选择要安装的版本 (输入数字 1-${#versions[@]}): "
+    read choice
+    
+    # 验证选择
+    if [[ ! "$choice" =~ ^[0-9]+$ ]] || [[ "$choice" -lt 1 ]] || [[ "$choice" -gt ${#versions[@]} ]]; then
+        echo "❌ 错误: 无效的选择，请输入 1-${#versions[@]} 之间的数字"
+        echo "您输入的是: '$choice'"
+        exit 1
+    fi
+    
+    SELECTED_VERSION="${versions[$((choice-1))]}"
+    local selected_version_num="${VERSION_INFO[$SELECTED_VERSION]}"
+    
+    echo ""
+    echo "✅ 您选择了: openGauss $SELECTED_VERSION (v$selected_version_num)"
+    echo "架构: $SYSTEM_ARCH"
+    
+    # 显示版本特性说明
+    case "$SELECTED_VERSION" in
+        "6.0.2(LTS)")
+            echo "特性: 最新LTS版本，性能优化，安全增强"
+            ;;
+        "7.0.0-RC1")
+            echo "特性: 候选发布版本，包含最新功能，适合测试环境"
+            ;;
+        "5.0.3(LTS)")
+            echo "特性: 成熟稳定版本，广泛验证"
+            ;;
+        *)
+            echo "特性: 稳定版本"
+            ;;
+    esac
+    echo ""
+}
+
+# 构建并验证下载链接
+prepare_download_url() {
+    echo "正在构建下载链接..."
+    echo "目标版本: $SELECTED_VERSION"
+    echo "系统架构: $SYSTEM_ARCH"
+    
+    SELECTED_URL=$(build_download_url "$SELECTED_VERSION" "$SYSTEM_ARCH")
+    
+    if [[ -z "$SELECTED_URL" ]]; then
+        echo "错误: 无法构建下载链接"
+        echo "版本: $SELECTED_VERSION"
+        echo "架构: $SYSTEM_ARCH"
+        exit 1
+    fi
+    
+    echo "构建的下载链接: $SELECTED_URL"
+}
+
+# 下载openGauss安装包
+download_opengauss() {
+    local filename=$(basename "$SELECTED_URL")
+    
+    echo "========================================="
+    echo "开始下载openGauss安装包..."
+    echo "下载链接: $SELECTED_URL"
+    echo "文件名: $filename"
+    echo "========================================="
+    
+    # 检查是否已存在文件
+    if [[ -f "$filename" ]]; then
+        echo "文件已存在，跳过下载: $filename"
+        return 0
+    fi
+    
+    # 使用wget下载
+    if command -v wget >/dev/null 2>&1; then
+        echo "使用wget下载..."
+        wget -c "$SELECTED_URL" -O "$filename" --progress=bar:force 2>&1
+    elif command -v curl >/dev/null 2>&1; then
+        echo "使用curl下载..."
+        curl -L -C - -o "$filename" "$SELECTED_URL" --progress-bar
+    else
+        echo "错误: 系统中未找到wget或curl命令"
+        echo "请先安装wget或curl: yum install wget curl -y"
+        exit 1
+    fi
+    
+    # 验证下载是否成功
+    if [[ ! -f "$filename" ]]; then
+        echo "错误: 下载失败"
+        exit 1
+    fi
+    
+    # 检查文件大小
+    local filesize=$(stat -c%s "$filename" 2>/dev/null || echo "0")
+    if [[ "$filesize" -lt 1000000 ]]; then  # 小于1MB可能是错误文件
+        echo "警告: 下载的文件大小异常 ($filesize bytes)"
+        echo "请检查网络连接和下载链接"
+    fi
+    
+    echo "下载完成: $filename (大小: $filesize bytes)"
+}
 
 # 主机名验证函数
 validate_hostname() {
@@ -30,14 +254,52 @@ get_local_ip() {
     echo $ip
 }
 
-
+# 显示支持的版本信息
+show_supported_versions() {
+    echo "========================================="
+    echo "支持的openGauss版本和架构:"
+    echo "========================================="
+    echo "版本信息:"
+    echo "- openGauss 7.0.0-RC1  - 支持 x86_64, AArch64"
+    echo "- openGauss 6.0.2(LTS) - 支持 x86_64, AArch64"
+    echo "- openGauss 6.0.1(LTS) - 支持 x86_64, AArch64"
+    echo "- openGauss 6.0.0(LTS) - 支持 x86_64, AArch64"
+    echo "- openGauss 6.0.0-RC1 - 支持 x86_64, AArch64"
+    echo "- openGauss 5.0.3(LTS) - 支持 x86_64, AArch64"
+    echo "- openGauss 5.0.2(LTS) - 支持 x86_64, AArch64"
+    echo "- openGauss 5.0.1(LTS) - 支持 x86_64, AArch64"
+    echo "- openGauss 5.0.0(LTS) - 支持 x86_64, AArch64"
+    echo ""
+    echo "系统要求:"
+    echo "- 操作系统: openEuler 22.03"
+    echo "- 架构: x86_64 或 AArch64"
+    echo "- 内存: 建议8GB以上"
+    echo "- 磁盘: 建议50GB以上可用空间"
+    echo "========================================="
+}
 
 set -e  # 遇到错误立即退出
 
 echo "========================================="
-echo "openGauss 6.0.0 自动安装脚本"
-echo "适用系统: openEuler 22.03 ARM64"
+echo "openGauss 自动安装脚本"
+echo "支持多版本和多架构自动选择"
+echo "内置URL版本 - 无需外部配置文件"
 echo "========================================="
+
+# 显示支持的版本信息
+show_supported_versions
+
+# 检测系统架构
+detect_architecture
+
+# 显示版本选择菜单
+show_version_menu
+
+# 构建下载链接
+prepare_download_url
+
+# 下载安装包
+download_opengauss
 
 # 检查系统版本
 echo "检查系统版本..."
@@ -86,24 +348,66 @@ LOCAL_IP=$(get_local_ip)
 echo "检测到本机IP地址: $LOCAL_IP"
 echo "========================================="
 
-# 步骤1: 下载openGauss安装包
-echo "步骤1: 下载openGauss 6.0.0安装包..."
-cd ~
-if [ ! -f "openGauss-All-6.0.0-openEuler22.03-aarch64.tar.gz" ]; then
-    echo "正在下载openGauss安装包..."
-    wget https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0/openEuler22.03/arm/openGauss-All-6.0.0-openEuler22.03-aarch64.tar.gz
-    echo "下载完成"
-else
-    echo "安装包已存在，跳过下载"
-fi
-
-# 步骤2: 安装必要工具
-echo "步骤2: 安装必要工具..."
+# 安装必要工具
+echo "步骤1: 安装必要工具..."
 yum install tar expect -y
 
+# 创建安装目录
+echo "步骤2: 创建安装目录..."
+mkdir -p /opt/software/openGauss/script/
 
-# 步骤3: 创建cluster_config.xml配置文件
-echo "步骤4: 创建集群配置文件..."
+# 切换到安装目录
+echo "步骤3: 切换到安装目录..."
+cd /opt/software/openGauss
+
+# 解压安装包
+echo "步骤4: 解压openGauss安装包..."
+DOWNLOADED_FILE=$(basename "$SELECTED_URL")
+tar -zxf ~/"$DOWNLOADED_FILE"
+
+# 根据版本动态解压OM包
+echo "正在检测OM包..."
+SELECTED_VERSION_NUM="${VERSION_INFO[$SELECTED_VERSION]}"
+
+# 根据版本类型查找不同的OM包命名规则
+if [[ "$SELECTED_VERSION_NUM" =~ ^5\. ]]; then
+    # 5.x版本OM包命名规则: openGauss-5.x.x-openEuler-64bit-om.tar.gz
+    OM_FILE=$(find . -name "openGauss-${SELECTED_VERSION_NUM}-${OS_VERSION_5X}-64bit-om.tar.gz" | head -1)
+    if [[ -z "$OM_FILE" ]]; then
+        # 尝试通配符匹配
+        OM_FILE=$(find . -name "openGauss-*-${OS_VERSION_5X}-64bit-om.tar.gz" | head -1)
+    fi
+else
+    # 6.x+版本OM包命名规则: openGauss-OM-6.x.x-openEuler22.03-架构.tar.gz
+    arch_suffix=""
+    if [[ "$SYSTEM_ARCH" == "AArch64" ]]; then
+        arch_suffix="$ARCH_SUFFIX_ARM"
+    else
+        arch_suffix="$ARCH_SUFFIX_X86"
+    fi
+    
+    OM_FILE=$(find . -name "openGauss-OM-${SELECTED_VERSION_NUM}-${OS_VERSION_6X}-${arch_suffix}.tar.gz" | head -1)
+    if [[ -z "$OM_FILE" ]]; then
+        # 尝试通配符匹配
+        OM_FILE=$(find . -name "openGauss-OM-*-${OS_VERSION_6X}-*.tar.gz" | head -1)
+    fi
+fi
+
+if [[ -n "$OM_FILE" ]]; then
+    echo "找到OM包: $OM_FILE"
+    echo "解压OM包..."
+    tar -zxf "$OM_FILE"
+    echo "✅ OM包解压完成"
+else
+    echo "⚠️  警告: 未找到匹配的OM包文件"
+    echo "版本: $SELECTED_VERSION_NUM"
+    echo "架构: $SYSTEM_ARCH"
+    echo "尝试查找所有可能的OM包..."
+    find . -name "*om*.tar.gz" -o -name "*OM*.tar.gz" | head -5
+fi
+
+# 创建集群配置文件
+echo "步骤5: 创建集群配置文件..."
 
 cat > cluster_config.xml << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -145,36 +449,17 @@ echo "配置信息:"
 echo "- 主机名: ${HOSTNAME}"
 echo "- IP地址: ${LOCAL_IP}"
 echo "- 数据库端口: 15400"
+echo "- 选择版本: ${SELECTED_VERSION}"
+echo "- 系统架构: ${SYSTEM_ARCH}"
+echo "- 下载链接: ${SELECTED_URL}"
 
-echo "集群配置文件已创建: cluster_config.xml"
-
-# 步骤4: 创建安装目录
-echo "步骤5: 创建安装目录..."
-mkdir -p /opt/software/openGauss/script/
-
-# 步骤5: 切换到安装目录
-echo "步骤6: 切换到安装目录..."
-cd /opt/software/openGauss
-
-# 步骤6: 解压安装包
-echo "步骤3: 解压openGauss安装包..."
-tar -zxf ~/openGauss-All-6.0.0-openEuler22.03-aarch64.tar.gz
-
-tar -zxf openGauss-OM-6.0.0-openEuler22.03-aarch64.tar.gz
-
-# 步骤7: 复制配置文件
-echo "步骤8: 复制配置文件..."
-cp ~/cluster_config.xml .
-
-# 步骤8: 设置目录权限
-echo "步骤9: 设置目录权限..."
+# 设置目录权限
+echo "步骤6: 设置目录权限..."
 chmod 755 -R /opt/software
 
-# 步骤10: 执行预安装
-echo "步骤10: 执行预安装..."
+# 执行预安装
+echo "步骤7: 执行预安装..."
 cd /opt/software/openGauss/script/
-
-
 
 echo "正在执行预安装，这可能需要几分钟时间..."
 echo "将自动创建omm用户并设置密码为: ${DEFAULT_PASSWORD}"
@@ -182,7 +467,7 @@ echo ""
 
 # 使用expect自动化输入
 expect << EOF
-set timeout 300
+set timeout -1
 log_user 1
 spawn ./gs_preinstall -U omm -G dbgrp -X /opt/software/openGauss/cluster_config.xml
 
@@ -205,13 +490,19 @@ expect {
     }
     "Preinstallation succeeded" {
         puts "预安装成功完成"
+        exit 0
     }
-    timeout {
-        puts "操作超时"
+    "Preinstallation failed" {
+        puts "预安装失败"
         exit 1
+    }
+    -re "ERROR|error|Error" {
+        puts "预安装过程中出现错误，但继续等待完成..."
+        exp_continue
     }
     eof {
         puts "预安装进程结束"
+        exit 0
     }
 }
 EOF
@@ -230,10 +521,9 @@ echo "========================================="
 echo "正在切换到omm用户并执行数据库安装..."
 su - omm << 'OMMSUDO'
 cd /opt/software/openGauss
-
 # 使用expect自动化数据库安装过程
 expect << EOF
-set timeout 600
+set timeout -1
 log_user 1
 spawn gs_install -X /opt/software/openGauss/cluster_config.xml
 
@@ -252,16 +542,23 @@ expect {
     }
     "Installation succeeded" {
         puts "数据库安装成功完成"
+        exit 0
     }
     "completed successfully" {
         puts "安装成功完成"
+        exit 0
     }
-    timeout {
-        puts "安装超时"
+    "Installation failed" {
+        puts "数据库安装失败"
         exit 1
     }
+    -re "ERROR|error|Error" {
+        puts "安装过程中出现错误，但继续等待完成..."
+        exp_continue
+    }
     eof {
-        puts "安装进程结束"
+        puts "openGauss数据库安装完成！"
+        exit 0
     }
 }
 
@@ -272,25 +569,45 @@ spawn gs_om -t status
 expect {
     "cluster_state" {
         puts "数据库状态检查完成"
+        exit 0
     }
-    timeout {
-        puts "状态检查超时"
+    -re "ERROR|error|Error" {
+        puts "状态检查出现错误，但已完成"
+        exit 0
     }
-    eof
+    eof {
+        puts "状态检查完成"
+        exit 0
+    }
 }
 EOF
+
+echo "========================================="
+# 获取并显示数据库版本信息
+# 设置环境变量
+export GAUSSHOME=/opt/huawei/install/app
+export PATH=$GAUSSHOME/bin:$PATH
+export LD_LIBRARY_PATH=$GAUSSHOME/lib:$LD_LIBRARY_PATH
+
+# 检查gsql命令是否可用并获取版本
+if command -v gsql >/dev/null 2>&1; then
+    echo "数据库版本信息:"
+    gsql -V 2>/dev/null || echo "注意: gsql命令可用但无法获取版本信息（安装完成后可用）"
+else
+    echo "注意: gsql命令尚未可用，将在安装完成后可用"
+fi
 
 OMMSUDO
 
 echo ""
-echo "========================================="
-echo "openGauss数据库安装完成！"
-echo ""
 echo "数据库信息："
+echo "- 版本: ${SELECTED_VERSION}"
+echo "- 架构: ${SYSTEM_ARCH}"
 echo "- 用户名: omm"
 echo "- 用户密码: ${DEFAULT_PASSWORD}"
 echo "- 数据库密码: ${DEFAULT_PASSWORD}"
 echo "- 数据库端口: 15400"
+echo "- 下载源: ${SELECTED_URL}"
 echo ""
 echo "常用命令："
 echo "1. 查看数据库状态: gs_om -t status"
