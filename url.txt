@@ -1,0 +1,84 @@
+
+22.03系统版本数据库下载链接
+
+openGauss 6.0.2(LTS)-AArch64   https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.2/openEuler22.03/arm/openGauss-All-6.0.2-openEuler22.03-aarch64.tar.gz
+
+openGauss 6.0.2(LTS)-x86_64	 https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.2/openEuler22.03/x86/openGauss-All-6.0.2-openEuler22.03-x86_64.tar.gz
+
+openGauss 7.0.0-RC1-x86_64   https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0-RC1/openEuler22.03/x86/openGauss-All-7.0.0-RC1-openEuler22.03-x86_64.tar.gz
+
+
+openGauss 7.0.0-RC1-AArch64     https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0-RC1/openEuler22.03/arm/openGauss-All-7.0.0-RC1-openEuler22.03-aarch64.tar.gz
+
+openGauss 6.0.0 (LTS)-AArch64       https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0/openEuler22.03/arm/openGauss-All-6.0.0-openEuler22.03-aarch64.tar.gz
+
+openGauss 6.0.0 (LTS)-AArch64  	 https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0/openEuler22.03/x86/openGauss-All-6.0.0-openEuler22.03-x86_64.tar.gz
+
+
+openGauss 6.0.0-RC1 AArch64和x86_64下载链接：
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0-RC1/arm_2203/openGauss-6.0.0-RC1-openEuler-64bit-all.tar.gz
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0-RC1/x86_openEuler_2203/openGauss-6.0.0-RC1-openEuler-64bit-all.tar.gz
+
+
+
+openGauss 5.0.3 (LTS)-AArch64    https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.3/arm_2203/openGauss-5.0.3-openEuler-64bit-all.tar.gz 
+
+openGauss 5.0.3 (LTS)-x86_64    https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.3/x86_openEuler_2203/openGauss-5.0.3-openEuler-64bit-all.tar.gz
+
+openGauss 5.0.2 (LTS)-AArch64     https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.2/arm_2203/openGauss-5.0.2-openEuler-64bit-all.tar.gz
+
+openGauss 5.0.2 (LTS)-x86_64         https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.2/x86_openEuler_2203/openGauss-5.0.2-openEuler-64bit-all.tar.gz
+
+openGauss 5.0.1 (LTS)-AArch64       https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.1/arm_2203/openGauss-5.0.1-openEuler-64bit-all.tar.gz
+
+openGauss 5.0.1 (LTS)-x86_64      https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.1/x86_openEuler_2203/openGauss-5.0.1-openEuler-64bit-all.tar.gz
+
+openGauss 5.0.0 (LTS)-AArch64     https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.0/arm_2203/openGauss-5.0.0-openEuler-64bit-all.tar.gz
+
+openGauss 5.0.0 (LTS)-x86_64      https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.0/x86_openEuler_2203/openGauss-5.0.0-openEuler-64bit-all.tar.gz
+
+
+
+20.03系统版本数据库下载链接
+
+openGauss 7.0.0-RC1 AArch64和x86_64下载链接：
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0-RC1/openEuler20.03/arm/openGauss-All-7.0.0-RC1-openEuler20.03-aarch64.tar.gz
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0-RC1/openEuler20.03/x86/openGauss-All-7.0.0-RC1-openEuler20.03-x86_64.tar.gz
+
+
+openGauss 6.0.2(LTS) AArch64和x86_64下载链接：
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.2/openEuler20.03/arm/openGauss-All-6.0.2-openEuler20.03-aarch64.tar.gz
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.2/openEuler20.03/x86/openGauss-All-6.0.2-openEuler20.03-x86_64.tar.gz
+
+
+openGauss 6.0.0(LTS) AArch64和x86_64下载链接：
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0/openEuler20.03/arm/openGauss-All-6.0.0-openEuler20.03-aarch64.tar.gz
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0/openEuler20.03/x86/openGauss-All-6.0.0-openEuler20.03-x86_64.tar.gz
+
+
+openGauss 6.0.0-RC1-AArch64和x86_64下载链接：
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0-RC1/arm/openGauss-6.0.0-RC1-openEuler-64bit-all.tar.gz
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/6.0.0-RC1/x86_openEuler/openGauss-6.0.0-RC1-openEuler-64bit-all.tar.gz
+
+
+openGauss 5.0.3(LTS) AArch64和x86_64下载链接：
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.3/arm/openGauss-5.0.3-openEuler-64bit-all.tar.gz
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.3/x86_openEuler/openGauss-5.0.3-openEuler-64bit-all.tar.gz
+
+
+openGauss 5.0.0(LTS) AArch64和x86_64下载链接
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.0/arm/openGauss-5.0.0-openEuler-64bit-all.tar.gz
+
+https://opengauss.obs.cn-south-1.myhuaweicloud.com/5.0.0/x86_openEuler/openGauss-5.0.0-openEuler-64bit-all.tar.gz

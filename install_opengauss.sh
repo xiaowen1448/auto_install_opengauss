@@ -12,6 +12,7 @@ HOSTNAME=host01
 SELECTED_VERSION=""
 SELECTED_URL=""
 SYSTEM_ARCH=""
+SYSTEM_OS_VERSION=""
 
 # 内置版本和URL信息
 declare -A VERSION_INFO
@@ -28,12 +29,16 @@ VERSION_INFO=(
 
 # URL构建配置常量
 readonly BASE_URL="https://opengauss.obs.cn-south-1.myhuaweicloud.com"
-readonly OS_VERSION_6X="openEuler22.03"
-readonly OS_VERSION_5X="openEuler"
+readonly OS_VERSION_6X_2203="openEuler22.03"
+readonly OS_VERSION_6X_2003="openEuler20.03"
+readonly OS_VERSION_5X_2203="openEuler"
+readonly OS_VERSION_5X_2003="openEuler"
 readonly ARCH_ARM_6X="arm"
 readonly ARCH_X86_6X="x86"
-readonly ARCH_ARM_5X="arm_2203"
-readonly ARCH_X86_5X="x86_openEuler_2203"
+readonly ARCH_ARM_5X_2203="arm_2203"
+readonly ARCH_X86_5X_2203="x86_openEuler_2203"
+readonly ARCH_ARM_5X_2003="arm"
+readonly ARCH_X86_5X_2003="x86_openEuler"
 readonly ARCH_SUFFIX_ARM="aarch64"
 readonly ARCH_SUFFIX_X86="x86_64"
 
@@ -41,21 +46,38 @@ readonly ARCH_SUFFIX_X86="x86_64"
 build_download_url() {
     local version="$1"
     local arch="$2"
+    local os_version="$3"
     local version_num="${VERSION_INFO[$version]}"
     
     # 判断版本类型
-    if [[ "$version_num" =~ ^5\. ]]; then
+    if [[ "$version_num" =~ ^5\. ]] || [[ "$version_num" == "6.0.0-RC1" ]]; then
         # 5.x版本URL构建
-        local arch_dir
-        if [[ "$arch" == "AArch64" ]]; then
-            arch_dir="$ARCH_ARM_5X"
+        local arch_dir os_ver
+        if [[ "$os_version" == "22.03" ]]; then
+            os_ver="$OS_VERSION_5X_2203"
+            if [[ "$arch" == "AArch64" ]]; then
+                arch_dir="$ARCH_ARM_5X_2203"
+            else
+                arch_dir="$ARCH_X86_5X_2203"
+            fi
         else
-            arch_dir="$ARCH_X86_5X"
+            os_ver="$OS_VERSION_5X_2003"
+            if [[ "$arch" == "AArch64" ]]; then
+                arch_dir="$ARCH_ARM_5X_2003"
+            else
+                arch_dir="$ARCH_X86_5X_2003"
+            fi
         fi
-        echo "${BASE_URL}/${version_num}/${arch_dir}/openGauss-${version_num}-${OS_VERSION_5X}-64bit-all.tar.gz"
+        echo "${BASE_URL}/${version_num}/${arch_dir}/openGauss-${version_num}-${os_ver}-64bit-all.tar.gz"
     else
         # 6.x+版本URL构建
-        local arch_path arch_suffix
+        local arch_path arch_suffix os_ver
+        if [[ "$os_version" == "22.03" ]]; then
+            os_ver="$OS_VERSION_6X_2203"
+        else
+            os_ver="$OS_VERSION_6X_2003"
+        fi
+        
         if [[ "$arch" == "AArch64" ]]; then
             arch_path="$ARCH_ARM_6X"
             arch_suffix="$ARCH_SUFFIX_ARM"
@@ -63,11 +85,91 @@ build_download_url() {
             arch_path="$ARCH_X86_6X"
             arch_suffix="$ARCH_SUFFIX_X86"
         fi
-        echo "${BASE_URL}/${version_num}/${OS_VERSION_6X}/${arch_path}/openGauss-All-${version_num}-${OS_VERSION_6X}-${arch_suffix}.tar.gz"
+        echo "${BASE_URL}/${version_num}/${os_ver}/${arch_path}/openGauss-All-${version_num}-${os_ver}-${arch_suffix}.tar.gz"
     fi
 }
 
-# 检测系统架构
+# 检测系统版本
+detect_system_version() {
+    echo "正在检测系统版本..."
+    
+    # 支持的系统版本列表
+    local supported_versions=("22.03" "20.03")
+    local detected_version=""
+    
+    # 方法1: 从 /etc/openEuler-release 读取版本信息
+    if [[ -f "/etc/openEuler-release" ]]; then
+        local release_info=$(cat /etc/openEuler-release)
+        echo "系统发行版信息: $release_info"
+        
+        # 提取版本号 (匹配 22.03 或 20.03)
+        if [[ "$release_info" =~ 22\.03 ]]; then
+            detected_version="22.03"
+        elif [[ "$release_info" =~ 20\.03 ]]; then
+            detected_version="20.03"
+        fi
+    fi
+    
+    # 方法2: 从 uname -a 读取内核版本信息作为辅助验证
+    local kernel_info=$(uname -a)
+    echo "内核版本信息: $kernel_info"
+    
+    # 从内核信息中提取版本号进行交叉验证
+    local kernel_version=""
+    if [[ "$kernel_info" =~ oe2203 ]]; then
+        kernel_version="22.03"
+    elif [[ "$kernel_info" =~ oe2003 ]]; then
+        kernel_version="20.03"
+    fi
+    
+    # 版本验证和确认
+    if [[ -n "$detected_version" ]]; then
+        if [[ -n "$kernel_version" && "$detected_version" != "$kernel_version" ]]; then
+            echo "⚠️  警告: 发行版版本($detected_version)与内核版本($kernel_version)不匹配"
+            echo "将使用发行版版本: $detected_version"
+        fi
+        SYSTEM_OS_VERSION="$detected_version"
+        echo "✅ 检测到系统版本: openEuler $SYSTEM_OS_VERSION"
+    else
+        echo "❌ 错误: 无法检测到支持的系统版本"
+        echo ""
+        echo "========================================="
+        echo "系统版本不支持！"
+        echo "========================================="
+        echo "当前脚本仅支持以下openEuler版本:"
+        for version in "${supported_versions[@]}"; do
+            echo "  - openEuler $version (LTS)"
+        done
+        echo ""
+        echo "请安装支持的系统版本后重新运行此脚本。"
+        echo ""
+        echo "系统要求:"
+        echo "- openEuler 22.03 (LTS-SP3) - 推荐版本"
+        echo "- openEuler 20.03 (LTS-SP1/SP2/SP3)"
+        echo ""
+        echo "获取系统镜像:"
+        echo "- 官方下载: https://www.openeuler.org/zh/download/"
+        echo "- 华为云镜像: https://mirrors.huaweicloud.com/openeuler/"
+        echo "========================================="
+        exit 1
+    fi
+    
+    # 验证版本是否在支持列表中
+    local version_supported=false
+    for supported in "${supported_versions[@]}"; do
+        if [[ "$SYSTEM_OS_VERSION" == "$supported" ]]; then
+            version_supported=true
+            break
+        fi
+    done
+    
+    if [[ "$version_supported" == false ]]; then
+        echo "❌ 错误: 检测到的系统版本 $SYSTEM_OS_VERSION 不在支持列表中"
+        exit 1
+    fi
+    
+    echo "系统版本校验通过: openEuler $SYSTEM_OS_VERSION"
+}
 detect_architecture() {
     local arch=$(uname -m)
     case $arch in
@@ -132,8 +234,9 @@ show_version_menu() {
     
     echo "========================================="
     echo "系统架构: $SYSTEM_ARCH"
-    echo "支持的操作系统: openEuler 22.03 / openEuler"
-    echo "========================================="
+    echo "系统版本: openEuler $SYSTEM_OS_VERSION"
+    echo "支持的操作系统: openEuler 22.03 / openEuler 20.03"
+    echo "========================================"
     echo -n "请选择要安装的版本 (输入数字 1-${#versions[@]}): "
     read choice
     
@@ -150,6 +253,7 @@ show_version_menu() {
     echo ""
     echo "✅ 您选择了: openGauss $SELECTED_VERSION (v$selected_version_num)"
     echo "架构: $SYSTEM_ARCH"
+    echo "系统版本: openEuler $SYSTEM_OS_VERSION"
     
     # 显示版本特性说明
     case "$SELECTED_VERSION" in
@@ -174,13 +278,15 @@ prepare_download_url() {
     echo "正在构建下载链接..."
     echo "目标版本: $SELECTED_VERSION"
     echo "系统架构: $SYSTEM_ARCH"
+    echo "系统版本: openEuler $SYSTEM_OS_VERSION"
     
-    SELECTED_URL=$(build_download_url "$SELECTED_VERSION" "$SYSTEM_ARCH")
+    SELECTED_URL=$(build_download_url "$SELECTED_VERSION" "$SYSTEM_ARCH" "$SYSTEM_OS_VERSION")
     
     if [[ -z "$SELECTED_URL" ]]; then
         echo "错误: 无法构建下载链接"
         echo "版本: $SELECTED_VERSION"
         echo "架构: $SYSTEM_ARCH"
+        echo "系统版本: $SYSTEM_OS_VERSION"
         exit 1
     fi
     
@@ -271,7 +377,7 @@ show_supported_versions() {
     echo "- openGauss 5.0.0(LTS) - 支持 x86_64, AArch64"
     echo ""
     echo "系统要求:"
-    echo "- 操作系统: openEuler 22.03"
+    echo "- 操作系统: openEuler 22.03 / openEuler 20.03"
     echo "- 架构: x86_64 或 AArch64"
     echo "- 内存: 建议8GB以上"
     echo "- 磁盘: 建议50GB以上可用空间"
@@ -284,10 +390,12 @@ echo "========================================="
 echo "openGauss 自动安装脚本"
 echo "支持多版本和多架构自动选择"
 echo "内置URL版本 - 无需外部配置文件"
-echo "========================================="
 
 # 显示支持的版本信息
 show_supported_versions
+
+# 检测系统版本
+detect_system_version
 
 # 检测系统架构
 detect_architecture
@@ -370,26 +478,40 @@ echo "正在检测OM包..."
 SELECTED_VERSION_NUM="${VERSION_INFO[$SELECTED_VERSION]}"
 
 # 根据版本类型查找不同的OM包命名规则
-if [[ "$SELECTED_VERSION_NUM" =~ ^5\. ]]; then
+if [[ "$SELECTED_VERSION_NUM" =~ ^5\. ]] || [[ "$SELECTED_VERSION_NUM" == "6.0.0-RC1" ]]; then
     # 5.x版本OM包命名规则: openGauss-5.x.x-openEuler-64bit-om.tar.gz
-    OM_FILE=$(find . -name "openGauss-${SELECTED_VERSION_NUM}-${OS_VERSION_5X}-64bit-om.tar.gz" | head -1)
+    os_ver=""
+    if [[ "$SYSTEM_OS_VERSION" == "22.03" ]]; then
+        os_ver="$OS_VERSION_5X_2203"
+    else
+        os_ver="$OS_VERSION_5X_2003"
+    fi
+    
+    OM_FILE=$(find . -name "openGauss-${SELECTED_VERSION_NUM}-${os_ver}-64bit-om.tar.gz" | head -1)
     if [[ -z "$OM_FILE" ]]; then
         # 尝试通配符匹配
-        OM_FILE=$(find . -name "openGauss-*-${OS_VERSION_5X}-64bit-om.tar.gz" | head -1)
+        OM_FILE=$(find . -name "openGauss-*-${os_ver}-64bit-om.tar.gz" | head -1)
     fi
 else
-    # 6.x+版本OM包命名规则: openGauss-OM-6.x.x-openEuler22.03-架构.tar.gz
+    # 6.x+版本OM包命名规则: openGauss-OM-6.x.x-openEuler22.03/20.03-架构.tar.gz
+    os_ver=""
     arch_suffix=""
+    if [[ "$SYSTEM_OS_VERSION" == "22.03" ]]; then
+        os_ver="$OS_VERSION_6X_2203"
+    else
+        os_ver="$OS_VERSION_6X_2003"
+    fi
+    
     if [[ "$SYSTEM_ARCH" == "AArch64" ]]; then
         arch_suffix="$ARCH_SUFFIX_ARM"
     else
         arch_suffix="$ARCH_SUFFIX_X86"
     fi
     
-    OM_FILE=$(find . -name "openGauss-OM-${SELECTED_VERSION_NUM}-${OS_VERSION_6X}-${arch_suffix}.tar.gz" | head -1)
+    OM_FILE=$(find . -name "openGauss-OM-${SELECTED_VERSION_NUM}-${os_ver}-${arch_suffix}.tar.gz" | head -1)
     if [[ -z "$OM_FILE" ]]; then
         # 尝试通配符匹配
-        OM_FILE=$(find . -name "openGauss-OM-*-${OS_VERSION_6X}-*.tar.gz" | head -1)
+        OM_FILE=$(find . -name "openGauss-OM-*-${os_ver}-*.tar.gz" | head -1)
     fi
 fi
 
@@ -402,6 +524,7 @@ else
     echo "⚠️  警告: 未找到匹配的OM包文件"
     echo "版本: $SELECTED_VERSION_NUM"
     echo "架构: $SYSTEM_ARCH"
+    echo "系统版本: openEuler $SYSTEM_OS_VERSION"
     echo "尝试查找所有可能的OM包..."
     find . -name "*om*.tar.gz" -o -name "*OM*.tar.gz" | head -5
 fi
@@ -451,7 +574,40 @@ echo "- IP地址: ${LOCAL_IP}"
 echo "- 数据库端口: 15400"
 echo "- 选择版本: ${SELECTED_VERSION}"
 echo "- 系统架构: ${SYSTEM_ARCH}"
+echo "- 系统版本: openEuler ${SYSTEM_OS_VERSION}"
 echo "- 下载链接: ${SELECTED_URL}"
+
+# openEuler 20.03系统需要创建libreadline.so.7软链接
+if [[ "$SYSTEM_OS_VERSION" == "20.03" ]]; then
+    echo "检测到openEuler 20.03系统，正在创建libreadline.so.7软链接..."
+    
+    # 检查是否已存在软链接
+    if [[ ! -L "/usr/lib64/libreadline.so.7" ]]; then
+        # 检查libreadline.so.8是否存在
+        if [[ -f "/usr/lib64/libreadline.so.8" ]]; then
+            echo "正在创建libreadline.so.7软链接..."
+            cd /usr/lib64
+            ln -s libreadline.so.8 libreadline.so.7
+            echo "✅ libreadline.so.7软链接创建成功"
+            
+            # 验证软链接
+            if [[ -L "/usr/lib64/libreadline.so.7" ]]; then
+                echo "软链接验证成功: $(ls -la /usr/lib64/libreadline.so.7)"
+            else
+                echo "❌ 软链接创建失败"
+                exit 1
+            fi
+        else
+            echo "❌ 错误: 未找到libreadline.so.8文件"
+            echo "请先安装readline库: yum install readline-devel -y"
+            exit 1
+        fi
+    else
+        echo "✅ libreadline.so.7软链接已存在，跳过创建"
+        echo "当前软链接: $(ls -la /usr/lib64/libreadline.so.7)"
+    fi
+    echo "========================================="
+fi
 
 # 设置目录权限
 echo "步骤6: 设置目录权限..."
@@ -516,6 +672,7 @@ echo "密码: ${DEFAULT_PASSWORD}"
 echo ""
 echo "开始执行数据库安装..."
 echo "========================================="
+
 
 # 切换到omm用户并执行安装
 echo "正在切换到omm用户并执行数据库安装..."
@@ -603,6 +760,7 @@ echo ""
 echo "数据库信息："
 echo "- 版本: ${SELECTED_VERSION}"
 echo "- 架构: ${SYSTEM_ARCH}"
+echo "- 系统版本: openEuler ${SYSTEM_OS_VERSION}"
 echo "- 用户名: omm"
 echo "- 用户密码: ${DEFAULT_PASSWORD}"
 echo "- 数据库密码: ${DEFAULT_PASSWORD}"
